@@ -207,7 +207,7 @@ def draw_vectors(nx, ny, width, height, seed=random.randint(0, 100000000), flow_
         # Compute the second points and draw the arrow body
         x_f = x_i + length*math.cos(math.radians(angle))
         y_f = y_i - length*math.sin(math.radians(angle))
-        p.drawLine(x_i, y_i, x_f, y_f)
+        p.drawLine(int(x_i), int(y_i), int(x_f), int(y_f))
 
         # Compute the arrow head second points
         a_angle1, a_angle2 = math.radians(angle-30), math.radians(angle+30)
@@ -215,8 +215,8 @@ def draw_vectors(nx, ny, width, height, seed=random.randint(0, 100000000), flow_
         y1 = y_f + (length/10)*math.sin(a_angle1)
         x2 = x_f - (length/10)*math.cos(a_angle2)
         y2 = y_f + (length/10)*math.sin(a_angle2)
-        p.drawLine(x_f, y_f, x1, y1)
-        p.drawLine(x_f, y_f, x2, y2)
+        p.drawLine(int(x_f), int(y_f), int(x1), int(y1))
+        p.drawLine(int(x_f), int(y_f), int(x2), int(y2))
 
     # Load the Perlin Noise image and draw it with the painter
     p.drawPixmap(QRect(0, 0, width, height), QPixmap(p_path))
@@ -239,42 +239,125 @@ def draw_vectors(nx, ny, width, height, seed=random.randint(0, 100000000), flow_
     # Save the vector image
     save(p, fname=v_path, folder='.')
 
-    # Now draw the flow field. Start by initializing a new painter
+
+def draw_flow_field_bw(width, height, seed=random.randint(0, 100000000)):
+    # Set the random seed for repeatability
+    np.random.seed(seed)
+
     p = Painter(width, height)
-    p.setRenderHint(p.Antialiasing)  # allow smooth drawing
-    p.setPen(QColor(0, 0, 0))  # pen color set to black
+    # Allow smooth drawing
+    p.setRenderHint(p.Antialiasing)
 
-    # Step size between points
+    # Draw the background color
+    p.fillRect(0, 0, width, height, QColor(0, 0, 0))
+
+    # Set the pen color
+    p.setPen(QPen(QColor(255, 255, 255), 2))
+
+    # Create the noise
+    p_noise = Perlin2D(width, height, 2, 2)
+
+    MAX_LENGTH = 2 * width
     STEP_SIZE = 0.001 * max(width, height)
+    NUM = int(width * height / 1000)
+    POINTS = [(random.randint(0, width - 1), random.randint(0, height - 1)) for i in range(NUM)]
 
-    # Draw the flow field
-    for x in x_points:
-        for y in y_points:
-            # The starting position
-            x_s, y_s = x, y
-            # The current line length tracking variable
-            c_len = 0
-            while c_len < flow_length:
-                # angle between 0 and 2*pi
-                angle = 2 * noise[int(x_s), int(y_s)] * math.pi
+    for k, (x_s, y_s) in enumerate(POINTS):
+        print(f'{100 * (k + 1) / len(POINTS):.1f}'.rjust(5) + '% Complete', end='\r')
 
-                # Compute the new point
-                x_f = x_s + STEP_SIZE * math.cos(angle)
-                y_f = y_s - STEP_SIZE * math.sin(angle)
+        # The current line length tracking variable
+        c_len = 0
 
-                # Draw the line
-                p.drawLine(QPointF(x_s, y_s), QPointF(x_f, y_f))
+        # Actually draw the flow field
+        while c_len < MAX_LENGTH:
+            # Set the pen color for this segment
+            sat = 200 * (MAX_LENGTH - c_len) / MAX_LENGTH
+            hue = 0  # Set hue to 0 for black and white
+            p.setPen(QPen(QColor_HSV(hue, sat, 255, 255), 2))
 
-                # Update the line length
-                c_len += math.sqrt((x_f - x_s) ** 2 + (y_f - y_s) ** 2)
+            # angle between -pi and pi
+            angle = p_noise[int(x_s), int(y_s)] * math.pi
 
-                # Break from the loop if the new point is outside our image bounds
-                # or if we've exceeded the line length; otherwise update the point
-                if x_f < 0 or x_f >= width or y_f < 0 or y_f >= height or c_len > flow_length:
-                    break
-                else:
-                    x_s, y_s = x_f, y_f
-    save(p, fname=f_path, folder='.')
+            # Compute the new point
+            x_f = x_s + STEP_SIZE * math.cos(angle)
+            y_f = y_s + STEP_SIZE * math.sin(angle)
+
+            # Draw the line
+            p.drawLine(QPointF(x_s, y_s), QPointF(x_f, y_f))
+
+            # Update the line length
+            c_len += math.sqrt((x_f - x_s) ** 2 + (y_f - y_s) ** 2)
+
+            # Break from the loop if the new point is outside our image bounds
+            # or if we've exceeded the line length; otherwise update the point
+            if x_f < 0 or x_f >= width or y_f < 0 or y_f >= height or c_len > MAX_LENGTH:
+                break
+            else:
+                x_s, y_s = x_f, y_f
+
+    save(p, fname=f'image_bw_{seed}', folder='.', overwrite=True)
+   
+   
+def draw_flow_field_gs(width, height, seed=random.randint(0, 100000000)):
+    # Set the random seed for repeatability
+    np.random.seed(seed)
+
+    for i in range(2):
+        p = Painter(width, height)
+
+        # Allow smooth drawing
+        p.setRenderHint(p.Antialiasing)
+
+        # Draw the background color
+        p.fillRect(0, 0, width, height, QColor(255, 255, 255))
+
+        # Set the pen color to black
+        p.setPen(QPen(QColor(0, 0, 0), 2))
+
+        num = 1
+        for j in range(num):
+            print('Creating Noise... (%s/%s)' % (j + 1, num))
+            p_noise = Perlin2D(width, height, 2, 2)
+            print('Noise Generated! (%s/%s)' % (j + 1, num))
+
+            MAX_LENGTH = 2 * width
+            STEP_SIZE = 0.001 * max(width, height)
+            NUM = int(width * height / 1000)
+            POINTS = [(random.randint(0, width - 1), random.randint(0, height - 1)) for i in range(NUM)]
+
+            for k, (x_s, y_s) in enumerate(POINTS):
+                print(f'{100 * (k + 1) / len(POINTS):.1f}'.rjust(5) + '% Complete', end='\r')
+
+                # The current line length tracking variable
+                c_len = 0
+
+                # Actually draw the flow field
+                while c_len < MAX_LENGTH:
+                    # Set the pen color for this segment
+                    value = 255 - int(255 * (MAX_LENGTH - c_len) / MAX_LENGTH)
+                    p.setPen(QPen(QColor(value, value, value), 2))
+
+                    # angle between -pi and pi
+                    angle = p_noise[int(x_s), int(y_s)] * math.pi
+
+                    # Compute the new point
+                    x_f = x_s + STEP_SIZE * math.cos(angle)
+                    y_f = y_s + STEP_SIZE * math.sin(angle)
+
+                    # Draw the line
+                    p.drawLine(QPointF(x_s, y_s), QPointF(x_f, y_f))
+
+                    # Update the line length
+                    c_len += math.sqrt((x_f - x_s) ** 2 + (y_f - y_s) ** 2)
+
+                    # Break from the loop if the new point is outside our image bounds
+                    # or if we've exceeded the line length; otherwise update the point
+                    if x_f < 0 or x_f >= width or y_f < 0 or y_f >= height or c_len > MAX_LENGTH:
+                        break
+                    else:
+                        x_s, y_s = x_f, y_f
+
+            save(p, fname=f'image_{i}_{j}_{seed}', folder='.', overwrite=True)
 
 def draw_flow_field(width, height, seed=random.randint(0, 100000000)):
     # Set the random seed for repeatability
@@ -341,6 +424,91 @@ def draw_flow_field(width, height, seed=random.randint(0, 100000000)):
 
             save(p, fname=f'image_{mod}_{num}_{seed}', folder='.', overwrite=True)
 
+
+def draw_flow_field_custom(width, height, seed=random.randint(0, 100000000)):
+    # Set the random seed for repeatability
+    np.random.seed(seed)
+    
+    
+    # Here are the hue values (in degrees) and their corresponding colors on the color wheel:
+
+    # 0: Red
+    # 30: Orange-Red
+    # 60: Yellow-Orange
+    # 90: Yellow
+    # 120: Yellow-Green
+    # 150: Green
+    # 180: Blue-Green
+    # 210: Blue
+    # 240: Blue-Purple
+    # 270: Purple
+    # 300: Red-Purple
+    # 330: Red
+    # Note that there can be some variation in the specific hue values used, as different color systems may define them slightly differently.
+
+    # These are color hues
+    colors = [60, 90]
+    for i, mod in enumerate(colors):
+        print('Starting Image %s/%s' % (i + 1, len(colors)))
+        p = Painter(width, height)
+
+        # Allow smooth drawing
+        p.setRenderHint(p.Antialiasing)
+
+        # Draw the background color
+        p.fillRect(0, 0, width, height, QColor(0, 0, 0))
+
+        # Set the pen color
+        p.setPen(QPen(QColor(150, 150, 225, 5), 2))
+
+        num = 1
+        for j in range(num):
+            print('Creating Noise... (%s/%s)' % (j + 1, num))
+            p_noise = Perlin2D(width, height, 2, 2)
+            print('Noise Generated! (%s/%s)' % (j + 1, num))
+
+            MAX_LENGTH = 2 * width
+            STEP_SIZE = 0.001 * max(width, height)
+            NUM = int(width * height / 1000)
+            POINTS = [(random.randint(0, width - 1), random.randint(0, height - 1)) for i in range(NUM)]
+
+            for k, (x_s, y_s) in enumerate(POINTS):
+                print(f'{100 * (k + 1) / len(POINTS):.1f}'.rjust(5) + '% Complete', end='\r')
+
+                # The current line length tracking variable
+                c_len = 0
+
+                # Actually draw the flow field
+                while c_len < MAX_LENGTH:
+                    # Set the pen color for this segment
+                    sat = 200 * (MAX_LENGTH - c_len) / MAX_LENGTH
+                    hue = (mod + 130 * (height - y_s) / height) % 360
+                    p.setPen(QPen(QColor_HSV(hue, sat, 255, 20), 2))
+
+                    # angle between -pi and pi
+                    angle = p_noise[int(x_s), int(y_s)] * math.pi
+
+                    # Compute the new point
+                    x_f = x_s + STEP_SIZE * math.cos(angle)
+                    y_f = y_s + STEP_SIZE * math.sin(angle)
+
+                    # Draw the line
+                    p.drawLine(QPointF(x_s, y_s), QPointF(x_f, y_f))
+
+                    # Update the line length
+                    c_len += math.sqrt((x_f - x_s) ** 2 + (y_f - y_s) ** 2)
+
+                    # Break from the loop if the new point is outside our image bounds
+                    # or if we've exceeded the line length; otherwise update the point
+                    if x_f < 0 or x_f >= width or y_f < 0 or y_f >= height or c_len > MAX_LENGTH:
+                        break
+                    else:
+                        x_s, y_s = x_f, y_f
+
+            save(p, fname=f'image_{mod}_{num}_{seed}', folder='.', overwrite=True)
+            
+            
+
 def draw_perlin_rounding(width, height, fname, seed=random.randint(0, 100000000)):
     # Ensure we don't overwrite paths
     assert not os.path.exists(fname), 'Image already exists!'
@@ -387,7 +555,7 @@ def draw_perlin_rounding(width, height, fname, seed=random.randint(0, 100000000)
             y_f = y_s + STEP_SIZE * math.sin(angle)
 
             # Draw the line
-            p.drawLine(x_s, y_s, x_f, y_f)
+            p.drawLine(int(x_s), int(y_s), int(x_f), int(y_f))
 
             # Update the line length
             c_len += math.sqrt((x_f - x_s) ** 2 + (y_f - y_s) ** 2)
@@ -477,7 +645,7 @@ class ExpandingCircleNoise:
         for i in range(len(self._bodies)):
             self._bodies[i].update(dt)
 
-def draw_delta_body(width, height, seed=random.randint(0, 100000000), mode='noise'):
+def draw_delta_body(width, height, seed=random.randint(10000000, 100000000), mode='noise'):
     assert mode in ['noise', 'random'], 'Mode must either be "noise" or "random"'
 
     # Set the random seed for repeatability
@@ -492,7 +660,7 @@ def draw_delta_body(width, height, seed=random.randint(0, 100000000), mode='nois
     p.fillRect(0, 0, width, height, QColor(0, 0, 0))
 
     # Set the pen color
-    p.setPen(QPen(QColor(220, 220, 220, 5), 1))
+    p.setPen(QPen(QColor(255, 165, 0, 5), 1))  # Set the pen color to orange
 
     # Initialize the expanding circle centered in the canvas
     if mode == 'random':
@@ -520,6 +688,9 @@ if __name__ == '__main__':
     # Uncomment whatever drawing you'd like to make
 
     # draw_flow_field(6000, 4000)
+    # draw_flow_field_bw(6000, 4000)
+    # draw_flow_field_gs(6000, 4000)
+draw_flow_field_custom(6000, 4000)
     # draw_white_noise(600, 300, f'{output_folder}/white_noise.jpg')
     # draw_perlin(5, 5, 1000, 1000, 'output_image.jpg')
     # draw_vectors(5, 5, 1000, 1000)
