@@ -200,7 +200,7 @@ def draw_vectors(nx, ny, width, height, seed=random.randint(0, 100000000), flow_
     noise = draw_perlin(nx, ny, width, height, p_path)
 
     # Initialize the painter object for drawing
-    p = painter.Painter(width, height)
+    p = Painter(width, height)
     p.setRenderHint(p.Antialiasing)  # allow smooth drawing
 
     def draw_arrow(p, x_i, y_i, length=100, angle=0):
@@ -240,7 +240,7 @@ def draw_vectors(nx, ny, width, height, seed=random.randint(0, 100000000), flow_
     save(p, fname=v_path, folder='.')
 
     # Now draw the flow field. Start by initializing a new painter
-    p = painter.Painter(width, height)
+    p = Painter(width, height)
     p.setRenderHint(p.Antialiasing)  # allow smooth drawing
     p.setPen(QColor(0, 0, 0))  # pen color set to black
 
@@ -284,7 +284,7 @@ def draw_flow_field(width, height, seed=random.randint(0, 100000000)):
     colors = [200, 140, 70, 340, 280]
     for i, mod in enumerate(colors):
         print('Starting Image %s/%s' % (i + 1, len(colors)))
-        p = painter.Painter(width, height)
+        p = Painter(width, height)
 
         # Allow smooth drawing
         p.setRenderHint(p.Antialiasing)
@@ -349,7 +349,7 @@ def draw_perlin_rounding(width, height, fname, seed=random.randint(0, 100000000)
     np.random.seed(seed)
 
     # Initialize a new painter
-    p = painter.Painter(width, height)
+    p = Painter(width, height)
     p.setRenderHint(p.Antialiasing)
 
     # Draw the background color
@@ -485,7 +485,7 @@ def draw_delta_body(width, height, seed=random.randint(0, 100000000), mode='nois
     random.seed(seed)
 
     # Initialize the painter
-    p = painter.Painter(width, height)
+    p = Painter(width, height)
     p.setRenderHint(p.Antialiasing)  # Allow smooth drawing
 
     # Draw the background color
@@ -511,3 +511,17 @@ def draw_delta_body(width, height, seed=random.randint(0, 100000000), mode='nois
         circle.draw(dt, p)
 
     save(p, fname=f'delta_{mode}_{seed}', folder='.', overwrite=True)
+
+if __name__ == '__main__':
+    output_folder = 'Images'
+    if not os.path.exists(output_folder):
+        os.mkdir(output_folder)
+
+    # Uncomment whatever drawing you'd like to make
+
+    # draw_flow_field(6000, 4000)
+    # draw_white_noise(600, 300, f'{output_folder}/white_noise.jpg')
+    # draw_perlin(5, 5, 1000, 1000, 'output_image.jpg')
+    # draw_vectors(5, 5, 1000, 1000)
+    # draw_perlin_rounding(6000, 4000, 'perlin_rounding')
+    # draw_delta_body(2000, 2000, mode='noise')
